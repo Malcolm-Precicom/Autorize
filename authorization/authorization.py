@@ -41,11 +41,16 @@ def capture_last_authorization_header(self, messageInfo):
         self.lastAuthorizationHeader = authorization
         self.fetchAuthorizationHeaderButton.setEnabled(True)
 
-
 def valid_tool(self, toolFlag):
-    return (toolFlag == self._callbacks.TOOL_PROXY or
-            (toolFlag == self._callbacks.TOOL_REPEATER and
-            self.interceptRequestsfromRepeater.isSelected()))
+    # Check if the toolFlag matches any of the specified conditions:
+    return (
+        # Check if the tool is the Proxy tool
+        toolFlag == self._callbacks.TOOL_PROXY or
+        # Check if the tool is the Repeater and is selected for interception
+        (toolFlag == self._callbacks.TOOL_REPEATER and self.interceptRequestsfromRepeater.isSelected()) or 
+        # Check if the tool is the Intruder tool
+        toolFlag == self._callbacks.TOOL_INTRUDER
+    )  # The function returns True if any of the above conditions are met
 
 def handle_304_status_code_prevention(self, messageIsRequest, messageInfo):
     should_prevent = False
@@ -174,27 +179,38 @@ def message_passed_interception_filters(self, messageInfo):
     return message_passed_filters
 
 def handle_message(self, toolFlag, messageIsRequest, messageInfo):
+    # Check if the tool should be ignored
     if tool_needs_to_be_ignored(self, toolFlag):
         return
 
+    # Capturing last cookie and authorization headers
     capture_last_cookie_header(self, messageInfo)
     capture_last_authorization_header(self, messageInfo)
 
+    # Main logic for processing messages
     if (self.intercept and valid_tool(self, toolFlag) or toolFlag == "AUTORIZE"):
+        # Code for handling 304 status code prevention
         handle_304_status_code_prevention(self, messageIsRequest, messageInfo)
 
+        # Processing response messages
         if not messageIsRequest:
+            # Check if the message is not from Autorize itself to avoid self-processing
             if message_not_from_autorize(self, messageInfo):
+                # Additional logic for handling specific status codes
                 if self.ignore304.isSelected():
                     if isStatusCodesReturned(self, messageInfo, ["304", "204"]):
-                        return
+                        return # Skip processing for specific status codes
 
+                # Check and apply filters
                 if no_filters_defined(self):
+                    # If no filters are defined, process the authorization check directly
                     checkAuthorization(self, messageInfo,
                     self._helpers.analyzeResponse(messageInfo.getResponse()).getHeaders(),
                                             self.doUnauthorizedRequest.isSelected())
                 else:
+                    # If filters are defined, ensure the message passes the interception filters
                     if message_passed_interception_filters(self, messageInfo):
+                        # Process the authorization check if the message passes the filters
                         checkAuthorization(self, messageInfo,self._helpers.analyzeResponse(messageInfo.getResponse()).getHeaders(),self.doUnauthorizedRequest.isSelected())
 
 def send_request_to_autorize(self, messageInfo):
